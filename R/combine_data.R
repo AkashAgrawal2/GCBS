@@ -31,10 +31,10 @@ combine_data <- function(df1, df2, key) {
       dataframes <- list(df_full_cases, df_combined, df_missing)
 
       print("Both the matched and unmatched rows were returned.")
-      print("To access the dataframe with matched rows, access the first item in the list that was returned using the following command: new_variable <- your_variable_name[[1]].")
-      print("To access the dataframe with ALL rows, access the second item in the list that was returned using the following command: new_variable <- your_variable_name[[2]].")
-      print("To access the dataframe with UNmatched rows, access the third item in the list that was returned using the following command: new_variable <- your_variable_name[[3].")
-      cat("\nExample: \nIf my function call was: \n\ndata_combined <- combine_dbs(data1, data2, key) \n\nThen to get the matched rows I would call: \n\ndata_matched rows <- data_combined[[1]] \nFor unmatched rows: \n\ndata_unmatched rows <- data_combined[[3]]")
+      print("A list was returned containing the dataframes with matched (1st index), all (2nd index), and unmatched rows (3rd index).")
+      print("To access each individual dataframe, perform the following command: new_variable <- your_variable_name[[index]]")
+      print("Replace index with the index of the dataframe you wish to access (Matched 1, All data 2, Unmatched 3)")
+      cat("\nExample: \nIf my function call was: \ndata_combined <- combine_dbs(data1, data2, key) \n\nThen to get the matched rows I would call: \ndata_matched rows <- data_combined[[1]] \n\nFor unmatched rows: \ndata_unmatched rows <- data_combined[[3]]")
 
       return(dataframes)
     } else {
