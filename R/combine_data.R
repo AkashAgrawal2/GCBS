@@ -17,6 +17,10 @@ combine_data <- function(df1, df2, key) {
 
   df_missing <- dplyr::anti_join(df_combined, df_full_cases, by = key)
 
+  df_combined <- select(df_combined, !ends_with("y"))
+  df_full_cases <- select(df_full_cases, !ends_with("y"))
+  df_missing <- select(df_missing, !ends_with("y"))
+
   len <- length(df_missing[[key]])
 
   if (len > 0) {
