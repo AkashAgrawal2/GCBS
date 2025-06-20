@@ -1,10 +1,10 @@
-test_that("combine_dbs merges and identifies unmatched rows correctly", {
+test_that("combine_data merges and identifies unmatched rows correctly", {
   library(dplyr)
 
   df1 <- data.frame(Key = c(1, 2, 3), A = c("a", "b", "c"))
   df2 <- data.frame(Key = c(2, 3, 4), B = c("x", "y", "z"))
 
-  result <- combine_dbs(df1, df2, "Key")
+  result <- combine_data(df1, df2, "Key")
 
   # If the function returns a list, extract combined and unmatched
   if (is.list(result) && length(result) == 2) {
