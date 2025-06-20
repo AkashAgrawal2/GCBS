@@ -10,7 +10,7 @@
 #' @import dplyr
 #' @importFrom tidyr drop_na
 #' @export
-combine_dbs <- function(df1, df2, key) {
+combine_data <- function(df1, df2, key) {
   df_combined <- dplyr::full_join(df1, df2, by = key)
 
   df_full_cases <- dplyr::inner_join(df1, df2, by = key)
