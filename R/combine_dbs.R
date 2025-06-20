@@ -7,6 +7,8 @@
 #' @param key Name of the column to join on (as a string).
 #'
 #' @return A combined dataframe or a list with matched and unmatched dataframes.
+#' @import dplyr
+#' @importFrom tidyr drop_na
 #' @export
 combine_dbs <- function(df1, df2, key) {
   df_combined <- full_join(df1, df2, by = key)
