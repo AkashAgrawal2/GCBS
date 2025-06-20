@@ -24,7 +24,7 @@ combine_data <- function(df1, df2, key) {
 
     input <- NULL
     print("Success")
-    cat("\nWould you like a list of the removed/unmatched rows?\n")
+    cat("\nWould you like a list of the removed/unmatched rows? (Enter yes/no)\n")
     input <- readline("> ")
 
     if (tolower(input) == "yes" | tolower(input) == "y") {
