@@ -11,11 +11,11 @@
 #' @importFrom tidyr drop_na
 #' @export
 combine_dbs <- function(df1, df2, key) {
-  df_combined <- full_join(df1, df2, by = key)
+  df_combined <- dplyr::full_join(df1, df2, by = key)
 
-  df_full_cases <- inner_join(df1, df2, by = key)
+  df_full_cases <- dplyr::inner_join(df1, df2, by = key)
 
-  df_missing <- anti_join(df_combined, df_full_cases, by = key)
+  df_missing <- dplyr::anti_join(df_combined, df_full_cases, by = key)
 
   len <- length(df_missing[[key]])
 
