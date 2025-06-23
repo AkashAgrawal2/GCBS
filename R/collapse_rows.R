@@ -1,52 +1,82 @@
-#' Collapse Rows by Key into New Columns
+#' Collapse Rows by Multiple Keys into New Columns
 #'
-#' Collapses multiple rows with the same key in a data frame by expanding values
-#' across new columns. This is useful when you want to flatten repeated records
-#' into a single row with additional columns.
+#' Collapses multiple rows with the same combination of two key columns into a single row,
+#' expanding varying values across multiple new columns. This is useful for flattening
+#' repeated records (e.g., multiple measurements per patient visit) into wide format.
 #'
-#' @param df A data frame that may contain repeated values for a key.
-#' @param key_col A string specifying the column name to use as the grouping key.
+#' Columns that have the same value for all rows in a group (defined by \code{key_col1} and \code{key_col2})
+#' are kept as a single column. Columns with multiple distinct values in a group are expanded
+#' with suffixes (_1, _2, etc.).
 #'
-#' @return A data frame with one row per key and multiple value columns per original variable.
-#' Each repeated value is placed in a new column with a suffix (_1, _2, etc.).
+#' @param df A data frame that may contain repeated rows per combination of two keys.
+#' @param key_col1 A string specifying the first key column (e.g., patient ID).
+#' @param key_col2 A string specifying the second key column (e.g., visit date).
+#'
+#' @return A data frame with one row per key combination and multiple value columns
+#' for each repeated variable. Columns with consistent values are not expanded.
 #'
 #' @examples
 #' df <- data.frame(
-#'   ID = c(1, 1, 2, 2, 2, 3),
-#'   Value = c("A", "B", "C", "C", NA, "D"),
-#'   Score = c(10, 20, 30, NA, 50, 60)
+#'   patient_id = c(1, 1, 1, 1, 1, 1),
+#'   visit_date = c("2024-01-01", "2024-01-01", "2024-01-01",
+#'                  "2024-02-01", "2024-02-01", "2024-02-01"),
+#'   name = rep("Alice", 6),
+#'   lab = c("A", "B", "C", "A", "B", "C"),
+#'   value = c(10, 12, 14, 8, 9, 10)
 #' )
-#' collapse_rows(df, "ID")
+#' collapse_rows(df, "patient_id", "visit_date")
 #'
-#' @importFrom dplyr select group_by mutate ungroup full_join
+#' @importFrom dplyr select group_by mutate ungroup summarise full_join across pull n_distinct first
 #' @importFrom tidyr pivot_wider
 #' @importFrom rlang sym
 #' @importFrom purrr reduce
 #' @export
-collapse_rows <- function(df, key_col) {
-  # Convert the key column name to a symbol for tidy evaluation
-  key_sym <- rlang::sym(key_col)
+collapse_rows <- function(df, key_col1, key_col2) {
 
-  # Identify all columns except the key
-  other_cols <- setdiff(names(df), key_col)
+  key_sym1 <- sym(key_col1)
+  key_sym2 <- sym(key_col2)
 
-  # Expand each column separately to avoid type conflicts
-  expanded_list <- lapply(other_cols, function(col) {
-    df_temp <- df %>%
-      dplyr::select(!!key_sym, dplyr::all_of(col)) %>%
-      dplyr::group_by(!!key_sym) %>%
-      dplyr::mutate(row_num = dplyr::row_number()) %>%
-      dplyr::ungroup() %>%
-      tidyr::pivot_wider(
+  key_cols <- c(key_col1, key_col2)
+
+  other_cols <- setdiff(names(df), key_cols)
+
+  # Identify constant columns (one unique value per group)
+  constant_cols <- other_cols[sapply(other_cols, function(col) {
+    df %>%
+      group_by(across(all_of(key_cols))) %>%
+      summarise(n_unique = n_distinct(.data[[col]]), .groups = "drop") %>%
+      pull(n_unique) %>%
+      max() == 1
+  })]
+
+  varying_cols <- setdiff(other_cols, constant_cols)
+
+  # Extract constant values
+  df_constants <- df %>%
+    group_by(across(all_of(key_cols))) %>%
+    summarise(across(all_of(constant_cols), ~ first(.x)), .groups = "drop")
+
+  # Expand varying values
+  expanded_list <- lapply(varying_cols, function(col) {
+    df %>%
+      select(all_of(key_cols), all_of(col)) %>%
+      group_by(across(all_of(key_cols))) %>%
+      mutate(row_num = row_number()) %>%
+      ungroup() %>%
+      pivot_wider(
         names_from = row_num,
-        values_from = dplyr::all_of(col),
+        values_from = all_of(col),
         names_prefix = paste0(col, "_")
       )
-    return(df_temp)
   })
 
-  # Merge the expanded columns by key
-  df_final <- purrr::reduce(expanded_list, dplyr::full_join, by = key_col)
+  # Merge all expanded columns
+  if (length(expanded_list) > 0) {
+    df_varying <- reduce(expanded_list, full_join, by = key_cols)
+    df_final <- full_join(df_constants, df_varying, by = key_cols)
+  } else {
+    df_final <- df_constants
+  }
 
   return(df_final)
 }
