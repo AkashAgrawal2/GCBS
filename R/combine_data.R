@@ -1,50 +1,79 @@
-#' Combine Two Dataframes by Reference Column
+#' Combine Two Dataframes by One or Two Key Columns
 #'
-#' This function performs a full join on two dataframes by a shared key, then identifies unmatched rows.
+#' Performs a full join on two dataframes using one or two shared key columns,
+#' identifies matched and unmatched rows, and optionally returns all three sets.
+#'
+#' Identical columns (other than keys) are merged to avoid duplicate `.x` / `.y` suffixes.
 #'
 #' @param df1 First dataframe.
 #' @param df2 Second dataframe.
-#' @param key Name of the column to join on (as a string).
+#' @param key_cols A character vector of one or two column names used for joining.
 #'
-#' @return A combined dataframe or a list with matched and unmatched dataframes.
+#' @return Either a dataframe of matched rows or a list containing matched rows,
+#' all rows (full join), and unmatched rows from \code{df1}.
+#'
 #' @import dplyr
 #' @importFrom tidyr drop_na
 #' @export
-combine_data <- function(df1, df2, key) {
-  df_combined <- dplyr::full_join(df1, df2, by = key)
+combine_data <- function(df1, df2, key_cols) {
+  # Safety: ensure key_cols is character vector of length 1 or 2
+  if (!(length(key_cols) %in% c(1, 2))) {
+    stop("`key_cols` must be a character vector of length 1 or 2.")
+  }
 
-  df_full_cases <- dplyr::inner_join(df1, df2, by = key)
+  # Perform full join
+  df_combined <- dplyr::full_join(df1, df2, by = key_cols, suffix = c(".x", ".y"))
 
-  df_missing <- dplyr::anti_join(df_combined, df_full_cases, by = key)
+  # Identify identical non-key columns (not duplicated during merge)
+  shared_cols <- intersect(setdiff(names(df1), key_cols), setdiff(names(df2), key_cols))
 
-  df_combined <- select(df_combined, !ends_with("y"))
-  df_full_cases <- select(df_full_cases, !ends_with("y"))
-  df_missing <- select(df_missing, !ends_with("y"))
+  # For identical columns: remove .y version and rename .x back
+  for (col in shared_cols) {
+    col_x <- paste0(col, ".x")
+    col_y <- paste0(col, ".y")
+    if (col_x %in% names(df_combined) && col_y %in% names(df_combined)) {
+      same_values <- dplyr::coalesce(df_combined[[col_x]], df_combined[[col_y]])
+      df_combined[[col]] <- same_values
+      df_combined[[col_x]] <- NULL
+      df_combined[[col_y]] <- NULL
+    }
+  }
 
-  len <- length(df_missing[[key]])
+  # Remove remaining .y columns (conflicting columns from df2)
+  df_combined <- df_combined %>% dplyr::select(-dplyr::matches("\\.y$"))
+
+  # Get matched rows (inner join)
+  df_full_cases <- dplyr::inner_join(df1, df2, by = key_cols)
+
+  # Get unmatched rows (rows in full join not in inner join)
+  df_missing <- dplyr::anti_join(df_combined, df_full_cases, by = key_cols)
+
+  len <- nrow(df_missing)
 
   if (len > 0) {
-    cat("Number of rows from", deparse(substitute(df1)), "that were not able to be matched to", deparse(substitute(df2)), ":", len, "\n")
+    cat("Number of rows from", deparse(substitute(df1)), "not matched in", deparse(substitute(df2)), ":", len, "\n")
 
     input <- NULL
-    print("Success")
     cat("\nWould you like a list of the removed/unmatched rows? (Enter yes/no)\n")
     input <- readline("> ")
 
-    if (tolower(input) == "yes" | tolower(input) == "y") {
-      dataframes <- list(df_full_cases, df_combined, df_missing)
+    if (tolower(input) %in% c("yes", "y")) {
+      dataframes <- list(
+        matched = df_full_cases,
+        combined = df_combined,
+        unmatched = df_missing
+      )
 
-      print("Both the matched and unmatched rows were returned.")
-      print("A list was returned containing the dataframes with matched (1st index), all (2nd index), and unmatched rows (3rd index).")
-      print("To access each individual dataframe, perform the following command: new_variable <- your_variable_name[[index]]")
-      print("Replace index with the index of the dataframe you wish to access (Matched 1, All data 2, Unmatched 3)")
-      cat("\nExample: \nIf my function call was: \ndata_combined <- combine_dbs(data1, data2, key) \n\nThen to get the matched rows I would call: \ndata_matched rows <- data_combined[[1]] \n\nFor unmatched rows: \ndata_unmatched rows <- data_combined[[3]]")
-
+      cat("Matched, all, and unmatched rows returned in a list:\n")
+      cat("  [[1]] matched rows\n")
+      cat("  [[2]] full combined dataset\n")
+      cat("  [[3]] unmatched rows from df1\n")
       return(dataframes)
     } else {
-      cat("Only the matched rows were returned")
+      cat("Only the matched rows were returned.\n")
       return(df_full_cases)
     }
   }
+
   return(df_full_cases)
 }

@@ -2,20 +2,25 @@
 % Please edit documentation in R/combine_data.R
 \name{combine_data}
 \alias{combine_data}
-\title{Combine Two Dataframes by Reference Column}
+\title{Combine Two Dataframes by One or Two Key Columns}
 \usage{
-combine_data(df1, df2, key)
+combine_data(df1, df2, key_cols)
 }
 \arguments{
 \item{df1}{First dataframe.}
 
 \item{df2}{Second dataframe.}
 
-\item{key}{Name of the column to join on (as a string).}
+\item{key_cols}{A character vector of one or two column names used for joining.}
 }
 \value{
-A combined dataframe or a list with matched and unmatched dataframes.
+Either a dataframe of matched rows or a list containing matched rows,
+all rows (full join), and unmatched rows from \code{df1}.
 }
 \description{
-This function performs a full join on two dataframes by a shared key, then identifies unmatched rows.
+Performs a full join on two dataframes using one or two shared key columns,
+identifies matched and unmatched rows, and optionally returns all three sets.
+}
+\details{
+Identical columns (other than keys) are merged to avoid duplicate \code{.x} / \code{.y} suffixes.
 }
