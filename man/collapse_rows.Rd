@@ -2,24 +2,40 @@
 % Please edit documentation in R/collapse_rows.R
 \name{collapse_rows}
 \alias{collapse_rows}
-\title{Collapse Rows by Visit and Add Visit-Based Suffixes}
+\title{Collapse Rows by Multiple Keys into New Columns}
 \usage{
 collapse_rows(df, key_col1, key_col2)
 }
 \arguments{
-\item{df}{A data frame with repeated rows per key combination.}
+\item{df}{A data frame that may contain repeated rows per combination of two keys.}
 
-\item{key_col1}{First key column (e.g., patient ID).}
+\item{key_col1}{A string specifying the first key column (e.g., patient ID).}
 
-\item{key_col2}{Second key column (e.g., visit date).}
+\item{key_col2}{A string specifying the second key column (e.g., visit date).}
 }
 \value{
-A wide-format data frame with one row per patient per visit,
-and varying values expanded with \verb{_procedure_1}, \verb{_procedure_2}, etc.
+A data frame with one row per key combination and multiple value columns
+for each repeated variable. Columns with consistent values are not expanded.
 }
 \description{
 Collapses multiple rows with the same combination of two key columns into a single row,
-expanding varying values across multiple columns. The suffix of each varying column includes
-the visit number (e.g., _procedure_1, _procedure_2). Columns that are constant per (key1, key2)
-group are retained as a single column.
+expanding varying values across multiple new columns. This is useful for flattening
+repeated records (e.g., multiple measurements per patient visit) into wide format.
+}
+\details{
+Columns that have the same value for all rows in a group (defined by \code{key_col1} and \code{key_col2})
+are kept as a single column. Columns with multiple distinct values in a group are expanded
+with suffixes (_1, _2, etc.).
+}
+\examples{
+df <- data.frame(
+  patient_id = c(1, 1, 1, 1, 1, 1),
+  visit_date = c("2024-01-01", "2024-01-01", "2024-01-01",
+                 "2024-02-01", "2024-02-01", "2024-02-01"),
+  name = rep("Alice", 6),
+  lab = c("A", "B", "C", "A", "B", "C"),
+  value = c(10, 12, 14, 8, 9, 10)
+)
+collapse_rows(df, "patient_id", "visit_date")
+
 }

@@ -1,23 +1,40 @@
-#' Collapse Rows by Visit and Add Visit-Based Suffixes
+#' Collapse Rows by Multiple Keys into New Columns
 #'
 #' Collapses multiple rows with the same combination of two key columns into a single row,
-#' expanding varying values across multiple columns. The suffix of each varying column includes
-#' the visit number (e.g., _procedure_1, _procedure_2). Columns that are constant per (key1, key2)
-#' group are retained as a single column.
+#' expanding varying values across multiple new columns. This is useful for flattening
+#' repeated records (e.g., multiple measurements per patient visit) into wide format.
 #'
-#' @param df A data frame with repeated rows per key combination.
-#' @param key_col1 First key column (e.g., patient ID).
-#' @param key_col2 Second key column (e.g., visit date).
+#' Columns that have the same value for all rows in a group (defined by \code{key_col1} and \code{key_col2})
+#' are kept as a single column. Columns with multiple distinct values in a group are expanded
+#' with suffixes (_1, _2, etc.).
 #'
-#' @return A wide-format data frame with one row per patient per visit,
-#' and varying values expanded with `_procedure_1`, `_procedure_2`, etc.
+#' @param df A data frame that may contain repeated rows per combination of two keys.
+#' @param key_col1 A string specifying the first key column (e.g., patient ID).
+#' @param key_col2 A string specifying the second key column (e.g., visit date).
 #'
-#' @importFrom dplyr select group_by mutate ungroup summarise full_join across pull n_distinct first distinct arrange
+#' @return A data frame with one row per key combination and multiple value columns
+#' for each repeated variable. Columns with consistent values are not expanded.
+#'
+#' @examples
+#' df <- data.frame(
+#'   patient_id = c(1, 1, 1, 1, 1, 1),
+#'   visit_date = c("2024-01-01", "2024-01-01", "2024-01-01",
+#'                  "2024-02-01", "2024-02-01", "2024-02-01"),
+#'   name = rep("Alice", 6),
+#'   lab = c("A", "B", "C", "A", "B", "C"),
+#'   value = c(10, 12, 14, 8, 9, 10)
+#' )
+#' collapse_rows(df, "patient_id", "visit_date")
+#'
+#' @importFrom dplyr select group_by mutate ungroup summarise full_join across pull n_distinct first
 #' @importFrom tidyr pivot_wider
 #' @importFrom rlang sym
 #' @importFrom purrr reduce
 #' @export
 collapse_rows <- function(df, key_col1, key_col2) {
+  key_sym1 <- sym(key_col1)
+  key_sym2 <- sym(key_col2)
+
   key_cols <- c(key_col1, key_col2)
 
   other_cols <- setdiff(names(df), key_cols)
@@ -25,63 +42,40 @@ collapse_rows <- function(df, key_col1, key_col2) {
   # Identify constant columns (one unique value per group)
   constant_cols <- other_cols[sapply(other_cols, function(col) {
     df %>%
-      dplyr::group_by(dplyr::across(dplyr::all_of(key_cols))) %>%
-      dplyr::summarise(n_unique = dplyr::n_distinct(.data[[col]]), .groups = "drop") %>%
-      dplyr::pull(n_unique) %>%
+      group_by(across(all_of(key_cols))) %>%
+      summarise(n_unique = n_distinct(.data[[col]]), .groups = "drop") %>%
+      pull(n_unique) %>%
       max() == 1
   })]
 
   varying_cols <- setdiff(other_cols, constant_cols)
 
-  # Step 1: Assign visit numbers (e.g., visit 1, visit 2...) per patient
-  df_visits <- df %>%
-    dplyr::distinct(dplyr::across(dplyr::all_of(key_cols))) %>%
-    dplyr::group_by(dplyr::across(dplyr::all_of(key_col1))) %>%
-    dplyr::arrange(.data[[key_col2]]) %>%
-    dplyr::mutate(visit_number = dplyr::row_number()) %>%
-    dplyr::ungroup()
-
-  # Join back to original data to add visit_number
-  df <- df %>%
-    dplyr::left_join(df_visits, by = key_cols)
-
   # Extract constant values
   df_constants <- df %>%
-    dplyr::group_by(dplyr::across(dplyr::all_of(key_cols))) %>%
-    dplyr::summarise(dplyr::across(dplyr::all_of(constant_cols), ~ dplyr::first(.x)), .groups = "drop")
+    group_by(across(all_of(key_cols))) %>%
+    summarise(across(all_of(constant_cols), ~ first(.x)), .groups = "drop")
 
-  # Expand varying columns with visit-aware suffixes
+  # Expand varying values
   expanded_list <- lapply(varying_cols, function(col) {
-    df_temp <- df %>%
-      dplyr::select(dplyr::all_of(key_col1), visit_number, dplyr::all_of(col)) %>%
-      dplyr::group_by(dplyr::across(dplyr::all_of(c(key_col1, "visit_number")))) %>%
-      dplyr::mutate(row_num = dplyr::row_number()) %>%
-      dplyr::ungroup() %>%
-      tidyr::pivot_wider(
+    df %>%
+      select(all_of(key_cols), all_of(col)) %>%
+      group_by(across(all_of(key_cols))) %>%
+      mutate(row_num = row_number()) %>%
+      ungroup() %>%
+      pivot_wider(
         names_from = row_num,
-        values_from = dplyr::all_of(col),
+        values_from = all_of(col),
         names_prefix = paste0(col, "_")
       )
-
-    # Rename columns to add visit suffix
-    non_key_cols <- setdiff(names(df_temp), c(key_col1, "visit_number"))
-    names(df_temp)[names(df_temp) %in% non_key_cols] <- paste0(non_key_cols, "_procedure_", df_temp$visit_number[1])
-
-    return(df_temp)
   })
 
-  # Merge expanded varying columns by patient and visit number
+  # Merge all expanded columns
   if (length(expanded_list) > 0) {
-    df_varying <- purrr::reduce(expanded_list, dplyr::full_join, by = c(key_col1, "visit_number"))
+    df_varying <- reduce(expanded_list, full_join, by = key_cols)
+    df_final <- full_join(df_constants, df_varying, by = key_cols)
   } else {
-    df_varying <- df_visits
+    df_final <- df_constants
   }
-
-  # Merge with constant columns
-  df_constants <- df_constants %>%
-    dplyr::left_join(df_visits, by = key_cols)
-
-  df_final <- dplyr::full_join(df_constants, df_varying, by = c(key_col1, "visit_number"))
 
   return(df_final)
 }
