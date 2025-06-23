@@ -2,7 +2,7 @@
 #'
 #' Collapses multiple rows with the same combination of two key columns into a single row,
 #' expanding varying values across multiple columns. The suffix of each varying column includes
-#' the visit number (e.g., _visit_1, _visit_2). Columns that are constant per (key1, key2)
+#' the visit number (e.g., _procedure_1, _procedure_2). Columns that are constant per (key1, key2)
 #' group are retained as a single column.
 #'
 #' @param df A data frame with repeated rows per key combination.
@@ -10,7 +10,7 @@
 #' @param key_col2 Second key column (e.g., visit date).
 #'
 #' @return A wide-format data frame with one row per patient per visit,
-#' and varying values expanded with `_visit_1`, `_visit_2`, etc.
+#' and varying values expanded with `_procedure_1`, `_procedure_2`, etc.
 #'
 #' @importFrom dplyr select group_by mutate ungroup summarise full_join across pull n_distinct first distinct arrange
 #' @importFrom tidyr pivot_wider
@@ -65,7 +65,7 @@ collapse_rows <- function(df, key_col1, key_col2) {
 
     # Rename columns to add visit suffix
     non_key_cols <- setdiff(names(df_temp), c(key_col1, "visit_number"))
-    names(df_temp)[names(df_temp) %in% non_key_cols] <- paste0(non_key_cols, "_visit_", df_temp$visit_number[1])
+    names(df_temp)[names(df_temp) %in% non_key_cols] <- paste0(non_key_cols, "_procedure_", df_temp$visit_number[1])
 
     return(df_temp)
   })

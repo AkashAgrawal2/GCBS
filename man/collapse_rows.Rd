@@ -15,11 +15,11 @@ collapse_rows(df, key_col1, key_col2)
 }
 \value{
 A wide-format data frame with one row per patient per visit,
-and varying values expanded with \verb{_visit_1}, \verb{_visit_2}, etc.
+and varying values expanded with \verb{_procedure_1}, \verb{_procedure_2}, etc.
 }
 \description{
 Collapses multiple rows with the same combination of two key columns into a single row,
 expanding varying values across multiple columns. The suffix of each varying column includes
-the visit number (e.g., _visit_1, _visit_2). Columns that are constant per (key1, key2)
+the visit number (e.g., _procedure_1, _procedure_2). Columns that are constant per (key1, key2)
 group are retained as a single column.
 }
