@@ -28,19 +28,18 @@ combine_data <- function(df1, df2, key_cols) {
   shared_cols <- intersect(setdiff(names(df1), key_cols), setdiff(names(df2), key_cols))
 
   # For identical columns: remove .y version and rename .x back
-  for (col in shared_cols) {
-    col_x <- paste0(col, ".x")
-    col_y <- paste0(col, ".y")
-    if (col_x %in% names(df_combined) && col_y %in% names(df_combined)) {
-      same_values <- dplyr::coalesce(df_combined[[col_x]], df_combined[[col_y]])
-      df_combined[[col]] <- same_values
-      df_combined[[col_x]] <- NULL
-      df_combined[[col_y]] <- NULL
-    }
-  }
-
+  #   for (col in shared_cols) {
+  #   col_x <- paste0(col, ".x")
+  #   col_y <- paste0(col, ".y")
+  #   if (col_x %in% names(df_combined) && col_y %in% names(df_combined)) {
+  #     same_values <- dplyr::coalesce(df_combined[[col_x]], df_combined[[col_y]])
+  #     df_combined[[col]] <- same_values
+  #     df_combined[[col_x]] <- NULL
+  #     df_combined[[col_y]] <- NULL
+  #   }
+  # }
   # Remove remaining .y columns (conflicting columns from df2)
-  df_combined <- df_combined %>% dplyr::select(-dplyr::matches("\\.y$"))
+  # df_combined <- df_combined %>% dplyr::select(-dplyr::matches("\\.y$"))
 
   # Get matched rows (inner join)
   df_full_cases <- dplyr::inner_join(df1, df2, by = key_cols)
