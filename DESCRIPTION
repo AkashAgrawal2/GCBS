@@ -1,9 +1,14 @@
 Package: GCBS
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
+Title: Easy, Reproducible Statistical Analysis and Data Cleaning Tools for Research
+Version: 0.0.1
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+    person("Akash", "Agrawal", email = "your.email@umich.edu", role = c("aut", "cre"))
+Description: 
+  Provides robust, beginner-friendly functions for data cleaning and comprehensive statistical analysis, 
+  tailored to the needs of scientific research. Includes easy handling for missing data and recoding, 
+  as well as one-line automatic t-tests, ANOVA, linear, logistic, and multinomial regression with 
+  stepwise model selection, high-quality plots, cross-validation, model diagnostics, and reproducible 
+  report outputs.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -12,10 +17,15 @@ Imports:
     dplyr,
     tidyr,
     ggplot2,
-    testthat,
-    nnet
+    nnet,
+    car,
+    pROC,
+    boot,
+    broom,
+    knitr
 Suggests: 
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    multcompView
 Config/testthat/edition: 3
 URL: https://github.com/AkashAgrawal2/GCBS
 BugReports: https://github.com/AkashAgrawal2/GCBS/issues
