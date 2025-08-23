@@ -4,14 +4,12 @@
 \alias{collapse_rows}
 \title{Collapse Rows by Multiple Keys into New Columns}
 \usage{
-collapse_rows(df, key_col1, key_col2)
+collapse_rows(df, key_cols)
 }
 \arguments{
 \item{df}{A data frame that may contain repeated rows per combination of two keys.}
 
-\item{key_col1}{A string specifying the first key column (e.g., patient ID).}
-
-\item{key_col2}{A string specifying the second key column (e.g., visit date).}
+\item{keycols}{A character vector containing a list of all key columns that will be used for matching (e.g., Primprocid).}
 }
 \value{
 A data frame with one row per key combination and multiple value columns

@@ -9,8 +9,7 @@
 #' with suffixes (_1, _2, etc.).
 #'
 #' @param df A data frame that may contain repeated rows per combination of two keys.
-#' @param key_col1 A string specifying the first key column (e.g., patient ID).
-#' @param key_col2 A string specifying the second key column (e.g., visit date).
+#' @param keycols A character vector containing a list of all key columns that will be used for matching (e.g., Primprocid).
 #'
 #' @return A data frame with one row per key combination and multiple value columns
 #' for each repeated variable. Columns with consistent values are not expanded.
@@ -31,12 +30,7 @@
 #' @importFrom rlang sym
 #' @importFrom purrr reduce
 #' @export
-collapse_rows <- function(df, key_col1, key_col2) {
-  key_sym1 <- sym(key_col1)
-  key_sym2 <- sym(key_col2)
-
-  key_cols <- c(key_col1, key_col2)
-
+collapse_rows <- function(df, key_cols) {
   other_cols <- setdiff(names(df), key_cols)
 
   # Identify constant columns (one unique value per group)
