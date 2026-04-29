@@ -1339,6 +1339,15 @@ ui <- page_navbar(
       max-width: 100%;
     }
 
+    .transform-controls-card .card-body {
+      max-height: calc(100vh - 255px);
+      overflow-y: auto;
+    }
+
+    .transform-controls-scroll {
+      min-width: 0;
+    }
+
     table {
       min-width: 640px;
       width: max-content;
@@ -1573,19 +1582,27 @@ ui <- page_navbar(
               "Type & Date",
               layout_columns(
                 card(
-                  card_header("Convert Column Type"),
-                  selectInput("transform_column", "Column to transform", choices = c("No active dataset" = "")),
-                  radioButtons("transform_type", "Transform selected column", choices = c("No change", "Factor", "Character", "Numeric", "Date"), inline = TRUE),
-                  actionButton("apply_transform", "Apply transform", class = "btn-primary")
+                  class = "transform-controls-card",
+                  card_header("Column Type & Date"),
+                  tags$div(
+                    class = "transform-controls-scroll",
+                    tags$h5("Convert Column Type"),
+                    selectInput("transform_column", "Column to transform", choices = c("No active dataset" = "")),
+                    radioButtons("transform_type", "Transform selected column", choices = c("No change", "Factor", "Character", "Numeric", "Date"), inline = TRUE),
+                    actionButton("apply_transform", "Apply transform", class = "btn-primary"),
+                    hr(),
+                    tags$h5("Parse Date Column"),
+                    selectInput("date_transform_column", "Column containing dates", choices = c("No active dataset" = "")),
+                    uiOutput("date_format_guess"),
+                    selectInput("date_format", "Date format", choices = date_format_choices, selected = "auto"),
+                    checkboxInput("date_replace_column", "Replace existing column", value = TRUE),
+                    textInput("date_new_column", "New date column name", value = "parsed_date"),
+                    actionButton("apply_date_transform", "Parse date", class = "btn-primary")
+                  )
                 ),
                 card(
-                  card_header("Parse Date Column"),
-                  selectInput("date_transform_column", "Column containing dates", choices = c("No active dataset" = "")),
-                  uiOutput("date_format_guess"),
-                  selectInput("date_format", "Date format", choices = date_format_choices, selected = "auto"),
-                  checkboxInput("date_replace_column", "Replace existing column", value = TRUE),
-                  textInput("date_new_column", "New date column name", value = "parsed_date"),
-                  actionButton("apply_date_transform", "Parse date", class = "btn-primary")
+                  card_header("Preview"),
+                  tableOutput("type_date_preview")
                 ),
                 col_widths = c(6, 6)
               )
@@ -1608,8 +1625,17 @@ ui <- page_navbar(
                   actionButton("apply_derive_column", "Create column", class = "btn-primary")
                 ),
                 card(
-                  card_header("Current Columns"),
-                  tableOutput("profile_transform")
+                  navset_tab(
+                    selected = "Preview",
+                    nav_panel(
+                      "Preview",
+                      tableOutput("derive_preview")
+                    ),
+                    nav_panel(
+                      "Current Columns",
+                      tableOutput("profile_transform")
+                    )
+                  )
                 ),
                 col_widths = c(6, 6)
               )
@@ -2028,12 +2054,39 @@ server <- function(input, output, session) {
     transform_choices <- if (length(choices)) choices else c("No active dataset" = "")
     key_choices <- if (length(choices)) choices else c("No primary key selected" = "")
     group_choices <- c("None" = "", choices)
-    updateSelectInput(session, "transform_column", choices = transform_choices, selected = transform_choices[[1]])
-    updateSelectInput(session, "date_transform_column", choices = transform_choices, selected = transform_choices[[1]])
-    updateSelectInput(session, "derive_column_a", choices = transform_choices, selected = transform_choices[[1]])
-    updateSelectInput(session, "derive_column_b", choices = transform_choices, selected = if (length(choices) > 1) choices[[2]] else transform_choices[[1]])
-    updateSelectInput(session, "recode_column", choices = transform_choices, selected = transform_choices[[1]])
-    updateSelectInput(session, "primary_key", choices = key_choices, selected = key_choices[[1]])
+    keep_selected <- function(current, available, fallback) {
+      if (length(current) && is_nonempty(current) && current %in% available) current else fallback
+    }
+    selected_transform_column <- keep_selected(isolate(input$transform_column), choices, transform_choices[[1]])
+    selected_date_transform_column <- keep_selected(isolate(input$date_transform_column), choices, transform_choices[[1]])
+    selected_derive_column_a <- keep_selected(isolate(input$derive_column_a), choices, transform_choices[[1]])
+    selected_derive_column_b <- keep_selected(
+      isolate(input$derive_column_b),
+      choices,
+      if (length(choices) > 1) choices[[2]] else transform_choices[[1]]
+    )
+    selected_recode_column <- keep_selected(isolate(input$recode_column), choices, transform_choices[[1]])
+    selected_primary_key <- keep_selected(isolate(input$primary_key), choices, key_choices[[1]])
+    updateSelectInput(session, "transform_column", choices = transform_choices, selected = selected_transform_column)
+    updateSelectInput(session, "date_transform_column", choices = transform_choices, selected = selected_date_transform_column)
+    updateSelectInput(session, "derive_column_a", choices = transform_choices, selected = selected_derive_column_a)
+    updateSelectInput(session, "derive_column_b", choices = transform_choices, selected = selected_derive_column_b)
+    updateSelectInput(session, "recode_column", choices = transform_choices, selected = selected_recode_column)
+    if (length(choices) && selected_recode_column %in% choices) {
+      recode_values <- sort(unique(as.character(data[[selected_recode_column]][!is.na(data[[selected_recode_column]])])))
+      current_recode_value <- isolate(input$recode_old_value)
+      selected_recode_value <- if (length(current_recode_value) && current_recode_value %in% recode_values) {
+        current_recode_value
+      } else if (length(recode_values)) {
+        recode_values[[1]]
+      } else {
+        character()
+      }
+      updateSelectizeInput(session, "recode_old_value", choices = recode_values, selected = selected_recode_value, server = TRUE)
+    } else {
+      updateSelectizeInput(session, "recode_old_value", choices = character(), selected = character(), server = TRUE)
+    }
+    updateSelectInput(session, "primary_key", choices = key_choices, selected = selected_primary_key)
     updateSelectInput(session, "figure_x", choices = transform_choices, selected = if (length(selected_predictors)) selected_predictors[1] else transform_choices[[1]])
     updateSelectInput(session, "figure_y", choices = transform_choices, selected = if (length(selected_outcomes)) selected_outcomes[1] else transform_choices[[1]])
     updateSelectInput(session, "figure_group", choices = group_choices, selected = "")
@@ -2378,10 +2431,22 @@ server <- function(input, output, session) {
     profile_data(data)
   })
 
-  output$preview <- renderTable({
+  transform_preview_data <- reactive({
     data <- data_store()
     if (!ncol(data)) return(data.frame(Message = "No active dataset."))
     data_with_type_headers(head(data, 12))
+  })
+
+  output$preview <- renderTable({
+    transform_preview_data()
+  })
+
+  output$type_date_preview <- renderTable({
+    transform_preview_data()
+  })
+
+  output$derive_preview <- renderTable({
+    transform_preview_data()
   })
 
   output$transform_message <- renderUI({
