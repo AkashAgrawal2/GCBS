@@ -14,4 +14,6 @@ if (length(missing_packages)) {
 args <- commandArgs(FALSE)
 file_arg <- sub("^--file=", "", args[grep("^--file=", args)] %||% "")
 app_dir <- if (nzchar(file_arg)) dirname(normalizePath(file_arg, mustWork = TRUE)) else getwd()
-shiny::runApp(app_dir, host = "127.0.0.1", port = 0, launch.browser = TRUE)
+
+message("Starting GCBS. If your browser does not open automatically, copy the URL printed below into your browser.")
+shiny::runApp(app_dir, host = "127.0.0.1", launch.browser = TRUE)
