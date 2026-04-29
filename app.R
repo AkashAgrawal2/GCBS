@@ -312,6 +312,11 @@ date_order_score <- function(values, order) {
 }
 
 guess_date_format <- function(x) {
+  if (inherits(x, "Date")) {
+    total <- length(x)
+    parsed <- sum(!is.na(x))
+    return(list(format = "%Y-%m-%d", label = "Already Date", confidence = 100, parsed = parsed, total = total))
+  }
   values <- trimws(as.character(x))
   values <- values[!is.na(values) & nzchar(values)]
   if (!length(values)) {
@@ -335,6 +340,9 @@ guess_date_format <- function(x) {
   scored <- do.call(rbind, scored)
   scored <- scored[order(scored$Score, scored$Parsed, decreasing = TRUE), , drop = FALSE]
   best <- scored[1, ]
+  if (!best$Parsed) {
+    return(list(format = NA_character_, label = "No matching date format", confidence = 0, parsed = 0, total = best$Total))
+  }
   label <- names(date_format_choices)[match(best$Format, date_format_choices)]
   if (is.na(label)) label <- best$Format
   list(
@@ -354,6 +362,16 @@ parse_date_column <- function(x, format = "auto") {
   }
   validate(need(is_nonempty(fmt), "No usable date format could be inferred. Choose a specific format."))
   suppressWarnings(as.Date(as.character(x), format = fmt))
+}
+
+default_date_column <- function(data) {
+  if (!ncol(data)) return(character())
+  choices <- names(data)
+  date_columns <- choices[vapply(data, inherits, logical(1), "Date")]
+  if (length(date_columns)) return(date_columns[[1]])
+  named_like_dates <- grep("date|time|day", choices, value = TRUE, ignore.case = TRUE)
+  if (length(named_like_dates)) return(named_like_dates[[1]])
+  choices[[1]]
 }
 
 coerce_recode_value <- function(value, target_type, reference = NULL) {
@@ -1957,6 +1975,7 @@ server <- function(input, output, session) {
   rename_message <- reactiveVal(NULL)
   transform_message <- reactiveVal(NULL)
   analysis_warnings <- reactiveVal(data.frame())
+  reset_analysis_inputs <- reactiveVal(TRUE)
   quick_label_settings <- reactiveVal(list(
     title = "Table 1. Patient Baseline Demographics and Clinical Characteristics of the Study",
     variable_header = "Variable",
@@ -1966,6 +1985,7 @@ server <- function(input, output, session) {
   ))
 
   observeEvent(input$use_example, {
+    reset_analysis_inputs(TRUE)
     if (isTRUE(input$use_example)) {
       data_store(example_data)
     } else if (!is.null(imported_data_store())) {
@@ -2009,6 +2029,7 @@ server <- function(input, output, session) {
     )
     validate(need(ncol(imported) > 0, "Choose at least one column to import."))
     imported_data_store(imported)
+    reset_analysis_inputs(TRUE)
     data_store(imported)
     pending_join(NULL)
     last_result(NULL)
@@ -2040,17 +2061,18 @@ server <- function(input, output, session) {
   observeEvent(data_store(), {
     data <- data_store()
     choices <- names(data)
-    default_outcomes <- intersect(c("outcome_score", "baseline_score", "response"), choices)
-    default_predictors <- intersect(c("treatment", "sex", "age"), choices)
-    if (!length(default_outcomes)) default_outcomes <- head(choices, min(3, length(choices)))
-    if (!length(default_predictors)) default_predictors <- head(setdiff(choices, default_outcomes), min(3, length(setdiff(choices, default_outcomes))))
     current_outcomes <- isolate(input$outcomes)
     current_predictors <- isolate(input$predictors)
-    selected_outcomes <- if (length(current_outcomes)) intersect(current_outcomes, choices) else default_outcomes
-    selected_predictors <- if (length(current_predictors)) intersect(current_predictors, choices) else default_predictors
+    reset_analysis <- isTRUE(reset_analysis_inputs())
+    selected_outcomes <- if (reset_analysis) character() else intersect(current_outcomes, choices)
+    selected_predictors <- if (reset_analysis) character() else intersect(current_predictors, choices)
 
     updateSelectizeInput(session, "outcomes", choices = choices, selected = selected_outcomes, server = TRUE)
     updateSelectizeInput(session, "predictors", choices = choices, selected = selected_predictors, server = TRUE)
+    method_choices <- c("All feasible recommended analyses", runnable_methods)
+    current_methods <- isolate(input$methods)
+    selected_methods <- if (reset_analysis) character() else intersect(current_methods, method_choices)
+    updateSelectizeInput(session, "methods", choices = method_choices, selected = selected_methods, server = TRUE)
     transform_choices <- if (length(choices)) choices else c("No active dataset" = "")
     key_choices <- if (length(choices)) choices else c("No primary key selected" = "")
     group_choices <- c("None" = "", choices)
@@ -2058,7 +2080,7 @@ server <- function(input, output, session) {
       if (length(current) && is_nonempty(current) && current %in% available) current else fallback
     }
     selected_transform_column <- keep_selected(isolate(input$transform_column), choices, transform_choices[[1]])
-    selected_date_transform_column <- keep_selected(isolate(input$date_transform_column), choices, transform_choices[[1]])
+    selected_date_transform_column <- keep_selected(isolate(input$date_transform_column), choices, default_date_column(data))
     selected_derive_column_a <- keep_selected(isolate(input$derive_column_a), choices, transform_choices[[1]])
     selected_derive_column_b <- keep_selected(
       isolate(input$derive_column_b),
@@ -2094,13 +2116,7 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "quick_group_columns", choices = choices, selected = character(), server = TRUE)
     rename_message(NULL)
     transform_message(NULL)
-  }, ignoreInit = FALSE)
-
-  observeEvent(data_store(), {
-    choices <- c("All feasible recommended analyses", runnable_methods)
-    current_methods <- isolate(input$methods)
-    selected <- if (length(current_methods)) intersect(current_methods, choices) else "All feasible recommended analyses"
-    updateSelectizeInput(session, "methods", choices = choices, selected = selected, server = TRUE)
+    reset_analysis_inputs(FALSE)
   }, ignoreInit = FALSE)
 
   observeEvent(input$figure_primary_color_name, {
